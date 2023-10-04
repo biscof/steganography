@@ -149,21 +149,31 @@ if __name__ == "__main__":
     CONST_END_TOKEN = "!3ND"
     stego_state = -1
     input_success = False
+    print("Enter 0 to hide a message. Enter 1 to extract a hidden message.")
     while input_success is False:
         try:
-            stego_state = int(input("Enter 0 to hide a message. Enter 1 to extract a hidden message.\n"))
-            if stego_state != 0 and stego_state != 1:
-                print("Please enter either 0 or 1.\n")
-            else:
+            stego_state = int(input())
+            if stego_state == 0:
+                file_name = input("\nPlease enter the file name.")
+                stego_hide_main(CONST_END_TOKEN, file_name)
                 input_success = True
+            elif stego_state == 1:
+                file_name = input("\nPlease enter the file name.")
+                print("The hidden message is: ", stego_extract_main(CONST_END_TOKEN, file_name))
+                input_success = True
+            else:
+                print("Please enter either 0 or 1.")
         except ValueError:
-            print("Please enter either 0 or 1.\n")
+            print("Please enter either 0 or 1.")
 
-    if stego_state == 0:
-        file_name = input("Please enter the file name.\n")
-        stego_hide_main(CONST_END_TOKEN, file_name)
 
-    elif stego_state == 1:
-        file_name = input("Please enter the file name.\n")
-        print("The hidden message is:",
-              stego_extract_main(CONST_END_TOKEN, file_name))
+
+
+
+
+
+
+
+
+
+
