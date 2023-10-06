@@ -3,9 +3,7 @@
 
 ## Overview
 
-This simple Python-based Steganography Tool was developed as a student project for a Computer Security Fundamentals course. It allows you to hide and extract text messages within images using steganography techniques. 
-
-Steganography is the practice of concealing one message within another in such a way that it's difficult to detect. In this tool, we hide text messages within the least significant bits (LSBs) of the color channels (RGB) of image pixels.
+This simple Python-based Steganography Tool was developed as a student project for a Computer Security Fundamentals course. It allows you to hide and extract text messages within images using steganography techniques. In this tool, we hide text messages within the least significant bits (LSBs) of the color channels (RGB) of image pixels.
 
 
 ## Features
