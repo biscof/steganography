@@ -1,179 +1,148 @@
 from PIL import Image
 
 
-def open_img(file_name):
+def get_available_bits(image):
+    # Use every 8th bit out of 24 bits in the RGB color representation (3 bits per pixel).
+    BITS_PER_PIXEL = 3
+    total_pixels = image.size[0] * image.size[1]
+    return BITS_PER_PIXEL * total_pixels
+
+
+def replace_least_significant_bit(color, msg_bit):
+    # Clear the least significant bit (LSB) to 0 using a mask (0xFE or 0b11111110 or 254).
+    # Then replace the LSB (0) with a message bit.
+    return (color & 0b11111110) | int(msg_bit)
+
+
+def get_image_with_secret(image, message_binary):
     """
-    Open and return an image file.
+    This function takes an input image and a binary message represented as a string of '0's and '1's. It iterates through
+    the pixels of the image, replacing the LSBs of each color channel (Red, Green, Blue) with bits from the secret message.
+    The embedding process stops when the entire message has been embedded.
     """
-    return Image.open(file_name)
+    width, height = image.size
+    msg_len = len(message_binary)
+    curr_msg_bit_index = 0
+
+    for y in range(height):
+        for x in range(width):
+            if curr_msg_bit_index >= msg_len:
+                break
+
+            current_pixel = image.getpixel((x, y))
+
+            # Convert the pixel tuple into a modifiable list.
+            new_pixel = list(current_pixel)
+
+            # Iterate through the color channels of the pixel and replace their LSBs.
+            for color_index in range(3):
+                if curr_msg_bit_index >= msg_len:
+                    break
+                new_color = replace_least_significant_bit(
+                    new_pixel[color_index],
+                    message_binary[curr_msg_bit_index]
+                )
+                new_pixel[color_index] = new_color
+                curr_msg_bit_index += 1
+
+            # Replace the pixel at the (x, y) position with the modified pixel.
+            image.putpixel((x, y), tuple(new_pixel))
+
+        if curr_msg_bit_index >= msg_len:
+            break
+
+    return image
 
 
-def get_available_bits(img_size):
+def hide_message_main(image, message, end_token):
     """
-    Get the available number of bits that we can use to store the payload.
+    This function takes an input image and a text message and hides the message within the image using steganography techniques.
+    It appends an end token to the message to mark the message's end and then encodes the message to ASCII and converts it to binary.
+    The function checks the available number of bits in the image that can be used to hide the message.
+    If the message is too long to fit within the available bits, an error message is displayed, and the function exits.
     """
-    # Get the overall number of bits,
-    # by finding the area of the image in pixels (length * breadth),
-    # then multiplying the result by 24.
-    bits = 3 * (img_size[0] * img_size[1])
+    image_copy = image.copy()
 
-    # The header is already dealt with by the Pillow library,
-    # so we DON'T need to subtract it.
-    return bits
+    message += end_token
+    message_ascii = message.encode("ASCII")
+    message_binary = "".join([format(i, '08b') for i in message_ascii])
+
+    # Get the available number of bits we can use to hide the message.
+    available_bits = get_available_bits(image_copy)
+
+    if len(message_binary) > available_bits:
+        print("Error: The message is too long to hide within this image."
+            "Please try a shorter message.")
+        return
+
+    image_with_secret = get_image_with_secret(image_copy, message_binary)
+    image_with_secret.save("stego_image.png")
 
 
-def replace_pixel(i, x, y, payload_bin, rgb_index, pixel_map):
+def extract_hidden_message_main(image, end_token):
     """
-    Replaces pixels of the cover image,
-    storing the payload in the least significant bit.
+    This function takes an input image and an end token and extracts a hidden text message from the image using steganography techniques.
+    It iterates through the pixels of the image, extracting the least significant bits (LSB) from each color channel (RGB) to reconstruct the hidden message.
+    The function continues extracting bits until it encounters the end token, indicating the end of the hidden message.
     """
-    # All bits in the byte as a list.
-    colour = list(bin(pixel_map[x, y][rgb_index])[2:])
+    current_char_bits = []
+    message = ""
+    width, height = image.size
+    BITS_IN_CHAR = 8
 
-    # Replace the least significant bit.
-    colour[-1] = payload_bin[i]
+    for y in range(height):
+        for x in range(width):
+            current_pixel_list = list(image.getpixel((x, y)))
 
-    # Rejoin the bits together as one string.
-    colour = "".join(colour)
+            # Extract least significant bits (LSB) from color channels (RGB). 
+            for color_index in range(3):
+                lsb = current_pixel_list[color_index] & 1
+                current_char_bits.append(lsb)
 
-    # Cast the string back to an integer.
-    colour = int(colour, 2)
+            # When we have enough bits in our list, we can join 8 bist to get the charater.
+            if len(current_char_bits) >= BITS_IN_CHAR:
+                char_code = int("".join(map(str, current_char_bits[:BITS_IN_CHAR])), 2)
+                curr_char = chr(char_code)
+                message += curr_char
 
-    # Increment the index.
-    i += 1
-    return colour, i
+                # Remove the first 8 bits from the list (we've already used them).
+                current_char_bits = current_char_bits[BITS_IN_CHAR:]
 
+                if end_token in message:
+                    return message[:-len(end_token)]
 
-def construct_stego_img(img_size, payload_bin, cover_pixels, stego_pixels):
-    i = 0
-    for x in range(img_size[0]):
-        for y in range(img_size[1]):
-            msg_len = len(payload_bin)
-            if i >= msg_len:
-                stego_pixels[x, y] = cover_pixels[x, y]
-            else:
-                if i < msg_len:
-                    new_r, i = replace_pixel(i, x, y,
-                                             payload_bin, 0, cover_pixels)
-                else:
-                    new_r = cover_pixels[x, y][0]
-                if i < msg_len:
-                    new_g, i = replace_pixel(i, x, y,
-                                             payload_bin, 1, cover_pixels)
-                else:
-                    new_g = cover_pixels[x, y][1]
-                if i < msg_len:
-                    new_b, i = replace_pixel(i, x, y,
-                                             payload_bin, 2, cover_pixels)
-                else:
-                    new_b = cover_pixels[x, y][2]
-
-                new_pixel = (new_r, new_g, new_b)
-                stego_pixels[x, y] = new_pixel
-
-
-def stego_hide_main(end_token, file_name):
-    # Receive message from user input.
-    payload = input("Please input a message to hide:\n")
-
-    # Add the end token.
-    payload += ascii(end_token)
-
-    # Open the cover image and load into memory.
-    cover_img = open_img(file_name)
-
-    # Get the available space in bits.
-    available_bits = get_available_bits(cover_img.size)
-
-    # Get length of payload in bits.
-    payload_ascii = payload.encode("ASCII")
-    payload_bin = "".join([format(i, '08b') for i in payload_ascii])
-    message_bit_length = 0
-    try:
-        message_bit_length = len(payload_bin) * 8
-    except message_bit_length > available_bits:
-        print("Error: message too long")
-
-    # Cache the width and height of the image.
-    width = cover_img.size[0]
-    height = cover_img.size[1]
-
-    # Create the stego image.
-    stego_img = Image.new("RGB", (width, height))
-    stego_img.save("stego_img.bmp")
-    stego_pixels = stego_img.load()
-    construct_stego_img(stego_img.size,
-                        payload_bin,
-                        cover_img.load(),
-                        stego_pixels)
-    stego_img.save("stego_image.bmp")
-
-
-def stego_extract_main(end_token, file_name):
-    message_whole = []
-    message_split = []
-
-    stego_img = open_img(file_name)
-    width = stego_img.size[0]
-    height = stego_img.size[1]
-
-    stego_pixels = stego_img.load()
-
-    for x in range(width):
-        for y in range(height):
-
-            # Iterating over each colour in RGB tuple.
-            for colour in stego_pixels[x, y]:
-
-                # if i < len(payload_bin):
-
-                # Identifying the last bit in each colour's binary value.
-                last_bit = list(bin(colour)[2:])[-1]
-
-                # Appending each LSB as a string to a list of all LSBs.
-                message_whole.append(last_bit)
-
-    # Iterate the list of all LSBs.
-    for i in range(0, len(message_whole), 8):
-
-        # Split into lists of 8 bits, then merge into strings.
-        # Convert string binary values into integers and then to ASCII symbols using chr().
-        message_split.append(chr(int("".join(message_whole[i:i+8]), 2)))
-
-    # Merge symbols from the message list into a string.
-    message = "".join(message_split)
-    return message[:message.index(end_token)]
+    return message
 
 
 if __name__ == "__main__":
-    CONST_END_TOKEN = "!3ND"
-    stego_state = -1
-    input_success = False
-    print("Enter 0 to hide a message. Enter 1 to extract a hidden message.")
-    while input_success is False:
+    END_TOKEN = "!3ND"
+    stego_option = -1
+    print("Welcome to the Steganography Tool!\n"
+        "Choose an option: Enter 0 to hide a message or 1 to extract a hidden message.")
+    while True:
         try:
-            stego_state = int(input())
-            if stego_state == 0:
-                file_name = input("\nPlease enter the file name.")
-                stego_hide_main(CONST_END_TOKEN, file_name)
-                input_success = True
-            elif stego_state == 1:
-                file_name = input("\nPlease enter the file name.")
-                print("The hidden message is: ", stego_extract_main(CONST_END_TOKEN, file_name))
-                input_success = True
+            stego_option = int(input())
+            if stego_option == 0 or stego_option == 1:
+                break
             else:
-                print("Please enter either 0 or 1.")
+                print("Please enter your choice (0 or 1):")
         except ValueError:
-            print("Please enter either 0 or 1.")
+            print("Invalid input. Please enter either 0 or 1.")
 
+    image = None
+    while True:
+        file_name = input("Enter the name of the image file (e.g., 'image.jpg'):\n")
+        try:
+            image = Image.open(file_name)
+            break
+        except FileNotFoundError:
+            print("Invalid file name provided or the file doesn't exist.")
 
-
-
-
-
-
-
-
-
-
-
+    if stego_option == 0:
+        message = input("Please input the message you want to hide:\n")
+        hide_message_main(image, message, END_TOKEN)
+        print("The stego image has been successfully saved as 'stego_image.png'.")
+    elif stego_option == 1:
+        hidden_msg = extract_hidden_message_main(image, END_TOKEN)
+        print(f"Message successfully extracted: {hidden_msg}")
+    print("Thank you for using the Steganography Tool!")
