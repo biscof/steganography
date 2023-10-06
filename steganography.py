@@ -16,8 +16,8 @@ def replace_least_significant_bit(color, msg_bit):
 
 def get_image_with_secret(image, message_binary):
     """
-    This function takes an input image and a binary message represented as a string of '0's and '1's. It iterates through
-    the pixels of the image, replacing the LSBs of each color channel (Red, Green, Blue) with bits from the secret message.
+    This function takes an input image and a binary message. It iterates through the pixels of the image,
+    replacing the LSBs of each color channel (Red, Green, Blue) with bits from the secret message.
     The embedding process stops when the entire message has been embedded.
     """
     width, height = image.size
@@ -56,10 +56,9 @@ def get_image_with_secret(image, message_binary):
 
 def hide_message_main(image, message, end_token):
     """
-    This function takes an input image and a text message and hides the message within the image using steganography techniques.
-    It appends an end token to the message to mark the message's end and then encodes the message to ASCII and converts it to binary.
-    The function checks the available number of bits in the image that can be used to hide the message.
-    If the message is too long to fit within the available bits, an error message is displayed, and the function exits.
+    This function takes an input image and a text message and hides the message within the image using steganography.
+    It appends an end token to the message to mark the message's end and then encodes the message to ASCII
+    and converts it to binary. Once the image with the hidden secret is obtained, it is saved.
     """
     image_copy = image.copy()
 
@@ -76,14 +75,15 @@ def hide_message_main(image, message, end_token):
         return
 
     image_with_secret = get_image_with_secret(image_copy, message_binary)
-    image_with_secret.save("stego_image.png")
+    image_with_secret.save("stego_image.bmp")
 
 
 def extract_hidden_message_main(image, end_token):
     """
-    This function takes an input image and an end token and extracts a hidden text message from the image using steganography techniques.
-    It iterates through the pixels of the image, extracting the least significant bits (LSB) from each color channel (RGB) to reconstruct the hidden message.
-    The function continues extracting bits until it encounters the end token, indicating the end of the hidden message.
+    This function extracts a hidden text message from the image using steganography.
+    It iterates through the pixels of the image, extracting the least significant bits (LSB)
+    from each color channel (RGB) to reconstruct the hidden message.
+    The function continues extracting bits until it finds the end token.
     """
     current_char_bits = []
     message = ""
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     if stego_option == 0:
         message = input("Please input the message you want to hide:\n")
         hide_message_main(image, message, END_TOKEN)
-        print("The stego image has been successfully saved as 'stego_image.png'.")
+        print("The stego image has been successfully saved as 'stego_image.bmp'.")
     elif stego_option == 1:
         hidden_msg = extract_hidden_message_main(image, END_TOKEN)
         print(f"Message successfully extracted: {hidden_msg}")
